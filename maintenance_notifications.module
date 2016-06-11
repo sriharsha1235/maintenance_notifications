@@ -1,0 +1,141 @@
+<?php
+
+/**
+ * @file
+ * Modules file for Maintenance Notifications.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function maintenance_notifications_menu() {
+  $items = array();
+  $items['admin/config/development/maintenance-notifications'] = array(
+    'title' => 'Maintenance Notification Settings',
+    'description' => 'Configure Maintenance Notifications.',
+    'access arguments' => array('administer site configuration'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('maintenance_notifications_admin_config'),
+  );
+  return $items;
+}
+
+/**
+ * Implementation of maintenance_notifications settings form.
+ *
+ * @param string or int or object... $form
+ * @param string or int or object... $form_state
+ *
+ * @return type
+ */
+function maintenance_notifications_admin_config($form, &$form_state) {
+  $form['maintenance_notifications_send_mail'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Send Maintenance Notification'),
+    '#default_value' => variable_get('maintenance_notifications_send_mail', ''),
+  );
+
+  $form['maintenance_notifications_users_list'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Users to send mail'),
+    '#description' => t('Enter comma seperated values'),
+    '#default_value' => variable_get('maintenance_notifications_users_list', ''),
+    '#required' => TRUE,
+  );
+
+  $form['maintenance_notifications_mail_subject'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Mail Subject'),
+    // '#description' => t('Enter comma seperated values'),.
+    '#default_value' => variable_get('maintenance_notifications_mail_subject', ''),
+    '#required' => TRUE,
+  );
+
+  $form['maintenance_notifications_mail_body'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Mail Body'),
+    // '#description' => t('Enter comma seperated values'),.
+    '#default_value' => variable_get('maintenance_notifications_mail_body', ''),
+    '#required' => TRUE,
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Custom form validation for email.
+ *
+ * @param string or int or object... $form
+ * @param string or int or object... $form_state
+ */
+function maintenance_notifications_admin_config_validate($form, $form_state) {
+  $maintenance_users_list = $form_state['values']['maintenance_notifications_users_list'];
+  if ($maintenance_users_list) {
+    $maintenance_users_list = explode(',', $maintenance_users_list);
+    foreach ($maintenance_users_list as $maintenance_user) {
+      if (!valid_email_address($maintenance_user)) {
+        form_set_error('maintenance_notifications_users_list', t('Invalid e-mail has been detected'));
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_form_form_id_alter().
+ *
+ * @param string $form
+ * @param string or int or object... $form_state
+ * @param string or int or object... $form_id
+ */
+function maintenance_notifications_form_system_site_maintenance_mode_alter(&$form, &$form_state, $form_id) {
+  $send_notification_mail = variable_get('maintenance_notifications_send_mail', '');
+  if ($send_notification_mail) {
+    $form['#submit'][] = 'maintenance_notification_submit';
+  }
+}
+
+/**
+ * Custom form submit to send notifications.
+ *
+ * @param string or int or object... $form
+ * @param string or int or object... $form_state
+ */
+function maintenance_notification_submit($form, &$form_state) {
+  $from = variable_get('site_mail', ini_get('sendmail_from'));
+  $to = variable_get('maintenance_notifications_users_list', '');
+  $params = array(
+    'body' => variable_get('maintenance_notifications_mail_body', ''),
+    'subject' => variable_get('maintenance_notifications_mail_subject', ''),
+  );
+
+  if (drupal_mail('maintenance_notifications', 'maintenance_notifications_key', $to, language_default(), $params, $from, TRUE)) {
+    drupal_set_message(t('Successfully sent the notifications.'));
+  }
+  else {
+    drupal_set_message(t('There was an error sending notification. Please try again later'));
+  }
+}
+
+/**
+ * Implements hook_mail().
+ *
+ * @param string or int or object... $key
+ * @param string or int or object... $message
+ * @param string or int or object... $params
+ */
+function maintenance_notifications_mail($key, &$message, $params) {
+
+  $headers = array(
+    'MIME-Version' => '1.0',
+    'Content-Type' => 'text/html; charset=UTF-8;',
+    'Content-Transfer-Encoding' => '8Bit',
+    'X-Mailer' => 'Drupal',
+  );
+
+  foreach ($headers as $key => $value) {
+    $message['headers'][$key] = $value;
+  }
+
+  $message['subject'] = $params['subject'];
+  $message['body'] = $params['body'];
+}

@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * @file
+ */
+
+name = Maintenance Notifications
+description = Sends a notification mail to the users
+package = Others
+settings = admin / config / development / maintenance - notifications
+core = 7.x
